@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+python-multipart
+numpy
+scipy
+librosa
+soundfile
+pydub
+psutil
+pyloudnorm
+websockets
+numba
+google-genai
+python-dotenv
+noisereduce
