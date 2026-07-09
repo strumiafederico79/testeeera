@@ -2672,7 +2672,16 @@ function setupLiveMeters(audioBuffer) {
   else metersSplitter.connect(metersAnalyserR, 0);
   metersAnalyserL.connect(gain);
   gain.connect(metersAudioCtx.destination);
-  src.start(0);
+  // Algunos navegadores mantienen el AudioContext en 'suspended' hasta
+  // que haya una interacción del usuario. Intentamos reanudarlo antes
+  // de arrancar la fuente para asegurar que el loop de análisis corra.
+  try {
+    if (metersAudioCtx.state === 'suspended') {
+      metersAudioCtx.resume().catch(()=>{});
+    }
+  } catch(e) {}
+  // Arrancar la fuente una vez solicitado el resume (siempre que sea posible)
+  try { src.start(0); } catch(e) { /* si falla, start se intentará al reanudar */ }
   metersSourceNode = src;
   metersLufsRingBuffer = [];
   const bufL = new Float32Array(metersAnalyserL.fftSize);
@@ -2724,8 +2733,11 @@ function cachedEl(id) {
 }
 function updateMeterFill(fillId, readoutId, db, fmt) {
   const pct = Math.max(0, Math.min(100, ((db+60)/60)*100));
-  cachedEl(fillId).style.height = pct + '%';
-  cachedEl(readoutId).textContent = db <= -99 ? '-∞' : fmt(db);
+  const fillEl = cachedEl(fillId);
+  const readEl = cachedEl(readoutId);
+  if (!fillEl) return;
+  fillEl.style.height = pct + '%';
+  if (readEl) readEl.textContent = db <= -99 ? '-∞' : fmt(db);
 }
 
 function updateMainMetersFromMetrics(metrics) {
@@ -2753,9 +2765,11 @@ function updateStereoMeter(corr) {
   const c = Math.max(-1, Math.min(1, corr));
   const pct = ((c+1)/2)*100;
   const fill = cachedEl('stereoMeterFill');
+  if (!fill) return;
   if (c >= 0) { fill.style.left = '50%'; fill.style.width = (pct-50)+'%'; }
   else { fill.style.left = pct+'%'; fill.style.width = (50-pct)+'%'; }
-  cachedEl('stereoMeterReadout').textContent = `corr: ${c.toFixed(2)} (${c>0.8?'mono-ish':c<-0.2?'fuera de fase':'estéreo'})`;
+  const read = cachedEl('stereoMeterReadout');
+  if (read) read.textContent = `corr: ${c.toFixed(2)} (${c>0.8?'mono-ish':c<-0.2?'fuera de fase':'estéreo'})`;
 }
 
 // ── Multiband GR & VU Meters (chain_meters from job result / streaming) ──────
